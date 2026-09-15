@@ -8,9 +8,9 @@ import streamlit as st
 st.set_page_config(page_title="Painel de Clientes - Nataly", layout="wide")
 
 
-# CONEXÃO DIRETA COM O SUPABASE
+# CONEXÃO VIA POOLER (SUPORTA IPV4 E STREAMLIT CLOUD)
 def get_connection():
-    db_url = "postgresql://postgres:PainelClientes99@db.ddfjybibhrulenpmnqra.supabase.co:5432/postgres?sslmode=require"
+    db_url = "postgresql://postgres.ddfjybibhrulenpmnqra:PainelClientes99@aws-0-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require"
     return psycopg2.connect(db_url)
 
 # Funções de banco de dados
