@@ -7,7 +7,7 @@ import streamlit as st
 
 st.set_page_config(page_title="Painel de Clientes - Nataly", layout="wide")
 
-# CSS para compactar a altura dos cards e da tela
+# CSS para acabamento limpo e containers compactos
 st.markdown("""
 <style>
     .block-container { 
@@ -17,8 +17,8 @@ st.markdown("""
 
     /* Reduz a altura interna dos cards (containers com borda) */
     div[data-testid="stVerticalBlockBorderWrapper"] > div {
-        padding-top: 0.4rem !important;
-        padding-bottom: 0.4rem !important;
+        padding-top: 0.35rem !important;
+        padding-bottom: 0.35rem !important;
         min-height: unset !important;
     }
 
@@ -29,29 +29,28 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Credenciais de acesso
+# CREDENCIAIS E CHAVE DE SEGURANÇA
 USUARIO_CORRETO = "nataly"
 SENHA_CORRETA = "studio123"
+CHAVE_ACESSO_SECRETA = "nataly_vip_sec_2026"
 
 
 def conectar_banco():
     db_url = "postgresql://postgres.ddfjybibhrulenpmnqra:PainelClientes99@aws-0-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require"
     return psycopg2.connect(db_url)
 
-# CHAVE SECRETA DE ACESSO RÁPIDO
-TOKEN_ACESSO = "nataly_studio_vip"
 
-# Controle de Sessão / Login (com suporte a token direto na URL)
-query_params = st.query_params
-
+# CONTROLE DE SESSÃO / LOGIN COM PROTEÇÃO
 if "autenticado" not in st.session_state:
-    if query_params.get("token") == TOKEN_ACESSO:
+    # Se abrir pelo link especial no celular, autentica direto
+    if st.query_params.get("key") == CHAVE_ACESSO_SECRETA:
         st.session_state["autenticado"] = True
     else:
         st.session_state["autenticado"] = False
 
+# Se NÃO estiver autenticado, exibe APENAS a tela de login e bloqueia o resto
 if not st.session_state["autenticado"]:
-    st.title("🔒 Acesso ao Painel")
+    st.title("🔒 Acesso Restrito - Studio Nataly")
     with st.form("form_login"):
         user = st.text_input("Usuário")
         senha = st.text_input("Senha", type="password")
@@ -60,10 +59,10 @@ if not st.session_state["autenticado"]:
                 st.session_state["autenticado"] = True
                 st.rerun()
             else:
-                st.error("Usuário ou senha incorretos.")
-    st.stop()
+                st.error("Credenciais inválidas.")
+    st.stop()  # O st.stop() aqui IMPEDE que qualquer dado de cliente seja carregado!
 
-# Controle da aba ativa nos botões
+# A PARTIR DAQUI O CÓDIGO SÓ RODA SE ESTIVER AUTENTICADO
 if "aba_ativa" not in st.session_state:
     st.session_state["aba_ativa"] = "alerta"
 
@@ -124,9 +123,10 @@ with st.sidebar:
     st.markdown("---")
     if st.button("Sair / Logout", use_container_width=True):
         st.session_state["autenticado"] = False
+        st.query_params.clear()
         st.rerun()
 
-# TOPO
+# CORPO PRINCIPAL
 st.title("💅 Painel de Clientes")
 
 with st.expander("➕ Cadastrar Nova Cliente", expanded=False):
@@ -141,19 +141,22 @@ with st.expander("➕ Cadastrar Nova Cliente", expanded=False):
 
         if st.form_submit_button("Salvar", use_container_width=True):
             if nome_novo and whats_novo:
-                conn_novo = conectar_banco()
-                cur_novo = conn_novo.cursor()
-                cur_novo.execute(
-                    "INSERT INTO clientes (nome, telefone, servico, data_ultima_manutencao, silenciado) VALUES (%s, %s, %s, %s, 0)",
-                    (nome_novo, whats_novo, servico_novo, data_novo)
-                )
-                conn_novo.commit()
-                cur_novo.close()
-                conn_novo.close()
-                st.success(f"{nome_novo} adicionada!")
-                st.rerun()
+                try:
+                    conn_novo = conectar_banco()
+                    cur_novo = conn_novo.cursor()
+                    cur_novo.execute(
+                        "INSERT INTO clientes (nome, telefone, servico, data_ultima_manutencao, silenciado) VALUES (%s, %s, %s, %s, 0)",
+                        (nome_novo, whats_novo, servico_novo, data_novo)
+                    )
+                    conn_novo.commit()
+                    cur_novo.close()
+                    conn_novo.close()
+                    st.success(f"{nome_novo} adicionada!")
+                    st.rerun()
+                except Exception as err:
+                    st.error(f"Erro ao cadastrar: {err}")
 
-# DADOS
+# CARREGAMENTO DOS DADOS
 try:
     conn_list = conectar_banco()
     cur_list = conn_list.cursor(cursor_factory=RealDictCursor)
@@ -175,7 +178,7 @@ if not df.empty:
     df_em_dia = df[(df["dias"] < 21) & (df["silenciado"] == 0)]
     df_silenciadas = df[df["silenciado"] == 1]
 
-    # BOTÕES NATIVOS COM BORDAS E FORMATO CONTAINER IDÊNTICOS AOS POPOVERS
+    # BOTÕES DE FILTRO
     col_b1, col_b2, col_b3, col_b4 = st.columns(4)
 
     with col_b1:
@@ -202,7 +205,6 @@ if not df.empty:
             st.session_state["aba_ativa"] = "silenciadas"
             st.rerun()
 
-    # Seleção da base correspondente ao botão clicado
     if st.session_state["aba_ativa"] == "alerta":
         df_exibir = df_alerta
     elif st.session_state["aba_ativa"] == "em_dia":
@@ -212,7 +214,7 @@ if not df.empty:
     else:
         df_exibir = df
 
-    # RENDERIZAÇÃO COMPACTA EM CARDS
+    # CARDS COMPACTOS
     if df_exibir.empty:
         st.info("Nenhuma cliente nesta categoria.")
     else:
@@ -220,24 +222,18 @@ if not df.empty:
             with st.container(border=True):
                 c1, c2, c3, c4 = st.columns([3, 2.5, 2, 2.5], vertical_alignment="center")
 
-                # Coluna 1: Nome e Procedimento
                 c1.markdown(
                     f"**{str(row['nome']).strip()}**  \n<span style='color: gray; font-size: 0.85rem;'>{row['servico']}</span>",
-                    unsafe_allow_html=True
-                )
-
-                # Coluna 2: Datas
+                    unsafe_allow_html=True)
                 c2.markdown(
                     f"<span style='font-size: 0.88rem;'>Última: {row['data_ultima_manutencao'].strftime('%d/%m/%Y')}</span>  \n**{row['dias']} dias atrás**",
                     unsafe_allow_html=True)
 
-                # Coluna 3: Badge de Status
                 badge = "🔇 Silenciada" if row["silenciado"] == 1 else row["status"]
                 c3.write(badge)
 
-                # Coluna 4: Botão WhatsApp
-                msg = f"Oi {row['nome']}! Tudo bem? Passando para lembrar que já faz {row['dias']} dias desde seu procedimento de {row['servico']}. Vamos garantir seu horário de manutenção?"
-                link_zap = f"https://wa.me/{row['telefone']}?text={urllib.parse.quote(msg)}"
+                msg = f"Oi {str(row['nome']).strip()}! Tudo bem? Passando para lembrar que já faz {row['dias']} dias desde seu procedimento de {row['servico']}. Vamos garantir seu horário de manutenção?"
+                link_zap = f"https://wa.me/{str(row['telefone']).strip()}?text={urllib.parse.quote(msg)}"
                 c4.link_button("📲 Chamar WhatsApp", link_zap, use_container_width=True)
 else:
     st.info("Nenhuma cliente encontrada.")
