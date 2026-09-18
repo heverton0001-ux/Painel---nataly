@@ -34,11 +34,9 @@ USUARIO_CORRETO = "nataly"
 SENHA_CORRETA = "studio123"
 CHAVE_ACESSO_SECRETA = "nataly_vip_sec_2026"
 
-
 def conectar_banco():
     db_url = "postgresql://postgres.ddfjybibhrulenpmnqra:PainelClientes99@aws-0-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require"
     return psycopg2.connect(db_url)
-
 
 # CONTROLE DE SESSÃO / LOGIN COM PROTEÇÃO
 if "autenticado" not in st.session_state:
@@ -110,8 +108,7 @@ with st.sidebar:
                 try:
                     conn_avulsa = conectar_banco()
                     cur_avulsa = conn_avulsa.cursor()
-                    cur_avulsa.execute("UPDATE clientes SET data_ultima_manutencao = %s WHERE id = %s",
-                                       (data_feita, id_selecionada))
+                    cur_avulsa.execute("UPDATE clientes SET data_ultima_manutencao = %s WHERE id = %s", (data_feita, id_selecionada))
                     conn_avulsa.commit()
                     cur_avulsa.close()
                     conn_avulsa.close()
@@ -135,10 +132,9 @@ with st.expander("➕ Cadastrar Nova Cliente", expanded=False):
         nome_novo = col1.text_input("Nome da Cliente").strip()
         whats_novo = col2.text_input("WhatsApp (ex: 5511999998888)").strip()
         col3, col4 = st.columns(2)
-        servico_novo = col3.selectbox("Procedimento",
-                                      ["Manutenção de Fibra", "Esmaltação em Gel", "Blindagem", "Alongamento Inicial"])
+        servico_novo = col3.selectbox("Procedimento", ["Manutenção de Fibra", "Esmaltação em Gel", "Blindagem", "Alongamento Inicial"])
         data_novo = col4.date_input("Data do Atendimento", value=date.today())
-
+        
         if st.form_submit_button("Salvar", use_container_width=True):
             if nome_novo and whats_novo:
                 try:
@@ -221,14 +217,10 @@ if not df.empty:
         for _, row in df_exibir.iterrows():
             with st.container(border=True):
                 c1, c2, c3, c4 = st.columns([3, 2.5, 2, 2.5], vertical_alignment="center")
-
-                c1.markdown(
-                    f"**{str(row['nome']).strip()}**  \n<span style='color: gray; font-size: 0.85rem;'>{row['servico']}</span>",
-                    unsafe_allow_html=True)
-                c2.markdown(
-                    f"<span style='font-size: 0.88rem;'>Última: {row['data_ultima_manutencao'].strftime('%d/%m/%Y')}</span>  \n**{row['dias']} dias atrás**",
-                    unsafe_allow_html=True)
-
+                
+                c1.markdown(f"**{str(row['nome']).strip()}**  \n<span style='color: gray; font-size: 0.85rem;'>{row['servico']}</span>", unsafe_allow_html=True)
+                c2.markdown(f"<span style='font-size: 0.88rem;'>Última: {row['data_ultima_manutencao'].strftime('%d/%m/%Y')}</span>  \n**{row['dias']} dias atrás**", unsafe_allow_html=True)
+                
                 badge = "🔇 Silenciada" if row["silenciado"] == 1 else row["status"]
                 c3.write(badge)
 
