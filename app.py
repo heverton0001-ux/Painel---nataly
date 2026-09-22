@@ -7,26 +7,9 @@ import streamlit as st
 
 st.set_page_config(page_title="Painel de Clientes - Nataly", layout="wide")
 
-# CSS para acabamento limpo e containers compactos
+# CSS para acabamento limpo, cards compactos e BOTÃO AZUL PISCANTE/PULSANTE
 st.markdown("""
-<style>
-    .block-container { 
-        padding-top: 1.2rem; 
-        padding-bottom: 2rem; 
-    }
 
-    /* Reduz a altura interna dos cards (containers com borda) */
-    div[data-testid="stVerticalBlockBorderWrapper"] > div {
-        padding-top: 0.35rem !important;
-        padding-bottom: 0.35rem !important;
-        min-height: unset !important;
-    }
-
-    /* Diminui o espaçamento vertical entre os textos dentro do card */
-    div[data-testid="stVerticalBlockBorderWrapper"] p {
-        margin-bottom: 0.2rem !important;
-    }
-</style>
 """, unsafe_allow_html=True)
 
 # CREDENCIAIS E CHAVE DE SEGURANÇA
@@ -40,7 +23,6 @@ def conectar_banco():
 
 # CONTROLE DE SESSÃO / LOGIN COM PROTEÇÃO
 if "autenticado" not in st.session_state:
-    # Se abrir pelo link especial no celular, autentica direto
     if st.query_params.get("key") == CHAVE_ACESSO_SECRETA:
         st.session_state["autenticado"] = True
     else:
@@ -59,11 +41,11 @@ if not st.session_state["autenticado"]:
             else:
                 st.error("Credenciais inválidas.")
 
-    st.stop()  # O st.stop() aqui IMPEDE que qualquer dado de cliente seja carregado!
+    st.stop()  # Impede renderizar qualquer dado antes do login
 
 # A PARTIR DAQUI O CÓDIGO SÓ RODA SE ESTIVER AUTENTICADO
 if "aba_ativa" not in st.session_state:
-    st.session_state["aba_ativa"] = "alerta"
+    st.session_state["aba_ativa"] = "lembrete_15"
 
 # BARRA LATERAL
 with st.sidebar:
@@ -169,64 +151,34 @@ if not df.empty:
     df["data_ultima_manutencao"] = pd.to_datetime(df["data_ultima_manutencao"]).dt.date
     hoje = date.today()
     df["dias"] = df["data_ultima_manutencao"].apply(lambda d: (hoje - d).days)
-    df["status"] = df["dias"].apply(lambda d: "🔴 Alerta (21+ dias)" if d >= 21 else "🟢 Em dia")
 
+    def classificar_status(dias):
+        if dias >= 21:
+            return "🔴 Alerta (21+ dias)"
+        elif 15 <= dias <= 20:
+            return "🔵 Lembrete (15 a 20 dias)"
+        else:
+            return "🟢 Em dia"
+
+    df["status"] = df["dias"].apply(classificar_status)
+
+    # SEGMENTAÇÃO POR FAIXAS DE DIAS
+    df_lembrete = df[(df["dias"] >= 15) & (df["dias"] <= 20) & (df["silenciado"] == 0)]
     df_alerta = df[(df["dias"] >= 21) & (df["silenciado"] == 0)]
-    df_em_dia = df[(df["dias"] < 21) & (df["silenciado"] == 0)]
+    df_em_dia = df[(df["dias"] < 15) & (df["silenciado"] == 0)]
     df_silenciadas = df[df["silenciado"] == 1]
 
-    # BOTÕES DE FILTRO
-    col_b1, col_b2, col_b3, col_b4 = st.columns(4)
+    # BANNER DE ALARME PARA A FAIXA DE OURO (15 A 20 DIAS)
+    if len(df_lembrete) > 0:
+        st.warning(
+            f"🚨 **ATENÇÃO NATALY:** Você tem **{len(df_lembrete)} cliente(s)** na janela ideal de 15 a 20 dias! "
+            f"Envie o lembrete hoje para que elas garantam vaga na agenda antes de estourar os 20 dias."
+        )
+
+    # 5 BOTÕES DE FILTRO EM COLUNAS
+    col_b1, col_b2, col_b3, col_b4, col_b5 = st.columns(5)
 
     with col_b1:
-        tipo1 = "primary" if st.session_state["aba_ativa"] == "alerta" else "secondary"
-        if st.button(f"🔴 Em Alerta ({len(df_alerta)})", use_container_width=True, type=tipo1):
-            st.session_state["aba_ativa"] = "alerta"
-            st.rerun()
-
-    with col_b2:
-        tipo2 = "primary" if st.session_state["aba_ativa"] == "em_dia" else "secondary"
-        if st.button(f"🟢 Em Dia ({len(df_em_dia)})", use_container_width=True, type=tipo2):
-            st.session_state["aba_ativa"] = "em_dia"
-            st.rerun()
-
-    with col_b3:
-        tipo3 = "primary" if st.session_state["aba_ativa"] == "todas" else "secondary"
-        if st.button(f"📋 Todas ({len(df)})", use_container_width=True, type=tipo3):
-            st.session_state["aba_ativa"] = "todas"
-            st.rerun()
-
-    with col_b4:
-        tipo4 = "primary" if st.session_state["aba_ativa"] == "silenciadas" else "secondary"
-        if st.button(f"🔇 Silenciadas ({len(df_silenciadas)})", use_container_width=True, type=tipo4):
-            st.session_state["aba_ativa"] = "silenciadas"
-            st.rerun()
-
-    if st.session_state["aba_ativa"] == "alerta":
-        df_exibir = df_alerta
-    elif st.session_state["aba_ativa"] == "em_dia":
-        df_exibir = df_em_dia
-    elif st.session_state["aba_ativa"] == "silenciadas":
-        df_exibir = df_silenciadas
-    else:
-        df_exibir = df
-
-    # CARDS COMPACTOS
-    if df_exibir.empty:
-        st.info("Nenhuma cliente nesta categoria.")
-    else:
-        for _, row in df_exibir.iterrows():
-            with st.container(border=True):
-                c1, c2, c3, c4 = st.columns([3, 2.5, 2, 2.5], vertical_alignment="center")
-                
-                c1.markdown(f"**{str(row['nome']).strip()}**  \n<span style='color: gray; font-size: 0.85rem;'>{row['servico']}</span>", unsafe_allow_html=True)
-                c2.markdown(f"<span style='font-size: 0.88rem;'>Última: {row['data_ultima_manutencao'].strftime('%d/%m/%Y')}</span>  \n**{row['dias']} dias atrás**", unsafe_allow_html=True)
-                
-                badge = "🔇 Silenciada" if row["silenciado"] == 1 else row["status"]
-                c3.write(badge)
-
-                msg = f"Oi {str(row['nome']).strip()}! Tudo bem? Passando para lembrar que já faz {row['dias']} dias desde seu procedimento de {row['servico']}. Vamos garantir seu horário de manutenção?"
-                link_zap = f"https://wa.me/{str(row['telefone']).strip()}?text={urllib.parse.quote(msg)}"
-                c4.link_button("📲 Chamar WhatsApp", link_zap, use_container_width=True)
-else:
-    st.info("Nenhuma cliente encontrada.")
+        # Se houver clientes nessa faixa, ativa o efeito pulsante chamativo
+        classe_pulsar = "btn-pulsar-azul" if len(df_lembrete) > 0 else ""
+        st.markdown(f'
